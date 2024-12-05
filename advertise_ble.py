@@ -15,7 +15,7 @@ def advertise_ble():
 	
 	try:
 		while True:
-		pass  # Keep the script running
+			pass  # Keep the script running
 	except KeyboardInterrupt:
 		print("Stopping advertisement...")
 		service.stop_advertising()
