@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 import asyncio
 from bleak import BleakScanner, BleakClient
+from bluetooth import *
 
 app = Flask(__name__)
 loop = asyncio.get_event_loop()
@@ -19,24 +20,24 @@ def scan_devices():
 
 
 @app.route('/connect', methods=['POST'])
-def connect_to_device():
-    """Connect to a specific BLE device."""
-    global connected_client
-    address = request.json.get('address')
 
-    if not address:
-        return jsonify({"error": "Device address is required"}), 400
+def connect_device(mac_address):
+    print(f"Attempting to pair with {mac_address}...")
 
-    async def connect(address):
-        client = BleakClient(address)
-        await client.connect()
-        return client
+    # Make the dev board discoverable
+    os.system("hciconfig hci0 piscan")
 
     try:
-        connected_client = loop.run_until_complete(connect(address))
-        return jsonify({"message": f"Connected to {address}"})
+        # Attempt to create a Bluetooth socket for pairing
+        sock = BluetoothSocket(RFCOMM)
+        sock.connect((mac_address, 1))  # Use RFCOMM channel 1
+        print(f"Successfully connected to {mac_address}")
+        sock.close()
+        return {"status": "success"}
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"Error during connection: {e}")
+        return {"status": "failure", "error": str(e)}
+
 
 
 @app.route('/disconnect', methods=['POST'])
