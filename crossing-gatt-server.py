@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-import dbus, dbus.mainloop.glib
+import dbus
+import dbus.service
+import dbus.mainloop.glib
 from gi.repository import GLib
 import threading
 
@@ -98,6 +100,8 @@ class Characteristic(dbus.service.Object):
     def ReadValue(self):
         return dbus.ByteArray(self.value)
 
+    @dbus.service.method("org.bluez.GattCharacteristic1",
+                         in_signature="", out_signature="")
     def StartNotify(self):
         if self.notifying:
             return
@@ -155,6 +159,5 @@ mainloop = GLib.MainLoop()
 manager.RegisterApplication(app.get_path(), {},
                             reply_handler=register_app_cb,
                             error_handler=register_app_error_cb)
-
 
 threading.Thread(target=mainloop.run).start()
