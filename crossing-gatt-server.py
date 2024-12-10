@@ -7,24 +7,23 @@ from gi.repository import GLib
 SERVICE_UUID = '12345678-1234-5678-1234-56789abcdef0'
 CHAR_UUID = 'abcdef01-1234-5678-1234-56789abcdef0'
 
-# Adapted from BlueZ example-gatt-server to provide a stable, known-working baseline.
-
 class Application(dbus.service.Object):
     """
-    org.bluez.GattApplication1 interface implementation.
+    GATT Application: Manages services.
     """
     PATH_BASE = '/org/bluez/example'
+
     def __init__(self, bus):
         self.path = self.PATH_BASE
         self.bus = bus
         self.services = []
         dbus.service.Object.__init__(self, bus, self.path)
 
-    def add_service(self, service):
-        self.services.append(service)
-
     def get_path(self):
         return dbus.ObjectPath(self.path)
+
+    def add_service(self, service):
+        self.services.append(service)
 
     def get_services(self):
         return self.services
@@ -34,9 +33,10 @@ class Application(dbus.service.Object):
     def Release(self):
         print('GATT application released')
 
+
 class Service(dbus.service.Object):
     """
-    org.bluez.GattService1 interface implementation.
+    GATT Service: Contains characteristics.
     """
     PATH_BASE = '/org/bluez/example/service'
 
@@ -47,6 +47,9 @@ class Service(dbus.service.Object):
         self.primary = primary
         self.characteristics = []
         dbus.service.Object.__init__(self, bus, self.path)
+
+    def get_path(self):
+        return dbus.ObjectPath(self.path)
 
     def add_characteristic(self, characteristic):
         self.characteristics.append(characteristic)
@@ -66,19 +69,24 @@ class Service(dbus.service.Object):
             raise dbus.exceptions.DBusException('org.freedesktop.DBus.Error.InvalidArgs', 'Invalid interface')
         return self.get_properties()
 
+
 class Characteristic(dbus.service.Object):
     """
-    org.bluez.GattCharacteristic1 interface implementation.
+    GATT Characteristic: The actual data point (e.g. "Cross" or "Don't Cross").
     """
     def __init__(self, uuid, flags, service, bus):
-        self.path = service.get_path() + '/char0'
         self.bus = bus
         self.uuid = uuid
         self.service = service
         self.flags = flags
+        # Unique path for this characteristic
+        self.path = service.get_path() + '/char0'
         self.value = bytearray("Don't Cross", 'utf-8')
         self.notifying = False
         dbus.service.Object.__init__(self, bus, self.path)
+
+    def get_path(self):
+        return dbus.ObjectPath(self.path)
 
     def get_properties(self):
         return {
@@ -112,7 +120,7 @@ class Characteristic(dbus.service.Object):
 
     def _add_timeout(self):
         if self.notifying:
-            # Just send periodic notifications as a heartbeat
+            # Send periodic notifications
             GLib.timeout_add(2000, self._notify_cb)
 
     def _notify_cb(self):
@@ -140,6 +148,7 @@ class Characteristic(dbus.service.Object):
                                    {'Value': dbus.ByteArray(self.value)},
                                    [])
 
+
 def register_app_cb():
     print("GATT application registered")
 
@@ -147,24 +156,26 @@ def register_app_error_cb(error):
     print("Failed to register application:", str(error))
     mainloop.quit()
 
-dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
-bus = dbus.SystemBus()
 
-app = Application(bus)
-service = Service(0, SERVICE_UUID, True, bus)
-char = Characteristic(CHAR_UUID, ['read','notify'], service, bus)
-service.add_characteristic(char)
-app.add_service(service)
+if __name__ == '__main__':
+    dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+    bus = dbus.SystemBus()
 
-manager = dbus.Interface(bus.get_object('org.bluez', '/org/bluez'),
-                         'org.bluez.GattManager1')
+    # Create application
+    app = Application(bus)
+    service = Service(0, SERVICE_UUID, True, bus)
+    char = Characteristic(CHAR_UUID, ['read','notify'], service, bus)
+    service.add_characteristic(char)
+    app.add_service(service)
 
-mainloop = GLib.MainLoop()
+    manager = dbus.Interface(bus.get_object('org.bluez', '/org/bluez'),
+                             'org.bluez.GattManager1')
+    mainloop = GLib.MainLoop()
 
-# Use dbus.Dictionary explicitly with a known signature to avoid ValueError on empty dict
-manager.RegisterApplication(app.get_path(),
-                            dbus.Dictionary({}, signature='sv'),
-                            reply_handler=register_app_cb,
-                            error_handler=register_app_error_cb)
+    # Register the application with a non-empty dictionary (use a proper signature)
+    manager.RegisterApplication(app.get_path(),
+                                dbus.Dictionary({}, signature='sv'),
+                                reply_handler=register_app_cb,
+                                error_handler=register_app_error_cb)
 
-mainloop.run()
+    mainloop.run()
