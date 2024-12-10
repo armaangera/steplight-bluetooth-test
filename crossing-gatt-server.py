@@ -8,11 +8,7 @@ SERVICE_UUID = '12345678-1234-5678-1234-56789abcdef0'
 CHAR_UUID = 'abcdef01-1234-5678-1234-56789abcdef0'
 
 class Application(dbus.service.Object):
-    """
-    GATT Application: Manages services.
-    """
     PATH_BASE = '/org/bluez/example'
-
     def __init__(self, bus):
         self.path = self.PATH_BASE
         self.bus = bus
@@ -35,11 +31,7 @@ class Application(dbus.service.Object):
 
 
 class Service(dbus.service.Object):
-    """
-    GATT Service: Contains characteristics.
-    """
     PATH_BASE = '/org/bluez/example/service'
-
     def __init__(self, index, uuid, primary, bus):
         self.path = self.PATH_BASE + str(index)
         self.bus = bus
@@ -58,7 +50,7 @@ class Service(dbus.service.Object):
         return {
             'org.bluez.GattService1': {
                 'UUID': self.uuid,
-                'Primary': self.primary,
+                'Primary': self.primary
             }
         }
 
@@ -71,15 +63,11 @@ class Service(dbus.service.Object):
 
 
 class Characteristic(dbus.service.Object):
-    """
-    GATT Characteristic: The actual data point (e.g. "Cross" or "Don't Cross").
-    """
     def __init__(self, uuid, flags, service, bus):
         self.bus = bus
         self.uuid = uuid
         self.service = service
         self.flags = flags
-        # Unique path for this characteristic
         self.path = service.get_path() + '/char0'
         self.value = bytearray("Don't Cross", 'utf-8')
         self.notifying = False
@@ -120,7 +108,6 @@ class Characteristic(dbus.service.Object):
 
     def _add_timeout(self):
         if self.notifying:
-            # Send periodic notifications
             GLib.timeout_add(2000, self._notify_cb)
 
     def _notify_cb(self):
@@ -168,11 +155,13 @@ if __name__ == '__main__':
     service.add_characteristic(char)
     app.add_service(service)
 
-    manager = dbus.Interface(bus.get_object('org.bluez', '/org/bluez'),
-                             'org.bluez.GattManager1')
-    mainloop = GLib.MainLoop()
+    # **Important:** Use '/org/bluez/hci0' instead of '/org/bluez'
+    manager = dbus.Interface(
+        bus.get_object('org.bluez', '/org/bluez/hci0'),
+        'org.bluez.GattManager1'
+    )
 
-    # Register the application with a non-empty dictionary (use a proper signature)
+    mainloop = GLib.MainLoop()
     manager.RegisterApplication(app.get_path(),
                                 dbus.Dictionary({}, signature='sv'),
                                 reply_handler=register_app_cb,
